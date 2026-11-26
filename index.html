@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Completeness Check</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE: clinical, exact, calm; an editorial QC instrument
+   IDEA: a pre-flight QC sheet clipped to a manuscript
+   PICTURE: the checklist itself, each line stamped with its status
+   COLOUR and TYPE: white and black, concrete planes, safety yellow for lines to check, red for action; Hanken Grotesk
+   LAYOUT: manuscript on the left, QC sheet on the right, author request under the sheet */
+:root{color-scheme:light dark;--bg:light-dark(#fff,#1a1a19);--ink:light-dark(#111,#ecebe6);--mute:light-dark(#5c5c58,#a3a29c);--plane:light-dark(#d8d8d4,#2b2b29);--field:light-dark(#f4f4f2,#222220);--line:light-dark(#e2e2de,#363632);--red:light-dark(#c8102e,#ff6b6b);--redink:light-dark(#fff,#1a1a19);--yel:#ffe600}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 "Hanken Grotesk",system-ui,sans-serif;overflow-x:clip}
+.band{padding:clamp(24px,3.5vw,48px) max(5vw,16px)}
+.wrap{max-width:1240px;margin:0 auto}
+header.band{background:var(--plane);padding-bottom:clamp(20px,2.5vw,32px)}
+h1{font-size:clamp(30px,4vw,42px);line-height:1.05;margin:0 0 10px;font-weight:600;text-wrap:balance;letter-spacing:-.01em}
+.lede{margin:0;max-width:66ch;color:var(--ink)}
+.priv{display:flex;gap:8px;align-items:center;margin:14px 0 0;font-size:14px;font-weight:500}
+.priv svg{flex:none}
+.work{display:grid;gap:clamp(20px,3vw,40px);grid-template-columns:minmax(0,1fr)}
+@media(min-width:960px){.work{grid-template-columns:minmax(0,5fr) minmax(0,7fr)}.in{position:sticky;top:16px;align-self:start}}
+h2{font-size:20px;line-height:1.2;margin:0 0 12px;font-weight:600}
+label.lab{display:block;font-size:14px;font-weight:600;margin:0 0 6px}
+textarea,input[type=text]{width:100%;font:16px/1.5 inherit;font-family:inherit;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:6px;padding:10px 12px}
+#ms{height:clamp(220px,46vh,460px);resize:vertical;font-size:15px}
+#ms.drag{outline:3px dashed var(--ink);outline-offset:-6px}
+textarea:focus-visible,input:focus-visible,button:focus-visible,summary:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+.row{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;align-items:center}
+button,.btn{font:600 15px/1 inherit;font-family:inherit;min-height:44px;padding:0 16px;border-radius:6px;border:1px solid var(--ink);background:transparent;color:var(--ink);cursor:pointer}
+.btn.pri{background:var(--ink);color:var(--bg)}
+.btn:hover{background:var(--field)}.btn.pri:hover{opacity:.88;background:var(--ink)}
+.note{font-size:13px;color:var(--mute);margin:8px 0 0}
+fieldset{border:0;padding:0;margin:20px 0 0}
+legend{font-size:14px;font-weight:600;padding:0;margin-bottom:4px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.chip-t{min-height:40px;font-weight:500;font-size:14px;border-color:var(--line);border-radius:20px;padding:0 14px}
+.chip-t[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.sum{display:flex;flex-wrap:wrap;gap:clamp(16px,3vw,36px);align-items:flex-end;padding-bottom:16px;border-bottom:2px solid var(--ink)}
+.sum .h{flex:1 1 260px;font-size:clamp(20px,2.2vw,24px);line-height:1.2;font-weight:600;text-wrap:balance;margin:0}
+.fig{display:flex;gap:clamp(14px,2.4vw,28px)}
+.fig div{text-align:right}
+.fig b{display:block;font-size:clamp(30px,4vw,44px);line-height:1;font-weight:600;font-variant-numeric:tabular-nums}
+.fig span{font-size:13px;color:var(--mute);white-space:nowrap}
+.fig .m b{color:var(--red)}
+ol.sheet{list-style:none;margin:0;padding:0}
+.ck{padding:16px 0;border-bottom:1px solid var(--line);display:grid;grid-template-columns:118px minmax(0,1fr);gap:4px 16px}
+.st{align-self:start;justify-self:start;font-size:13px;font-weight:700;padding:5px 10px;border-radius:4px;white-space:nowrap;border:1.5px solid var(--ink)}
+.s-miss .st{background:var(--red);color:var(--redink);border-color:var(--red)}
+.s-warn .st{background:var(--yel);color:#111;border-color:var(--yel)}
+.s-na .st{border-color:var(--line);color:var(--mute)}
+.ck h3{font-size:17px;line-height:1.3;margin:2px 0 4px;font-weight:600}
+.ck ul{margin:0;padding-left:18px}
+.ck li{margin:2px 0}
+.s-na h3,.s-na li{color:var(--mute)}
+.inc{display:inline-flex;gap:8px;align-items:center;font-size:14px;margin-top:8px;min-height:32px;cursor:pointer}
+.inc input{width:18px;height:18px;accent-color:var(--ink)}
+details{margin-top:6px;font-size:14px}
+summary{cursor:pointer;color:var(--mute);min-height:28px}
+.ex{margin:6px 0 0;padding:10px 12px;background:var(--field);border-radius:6px;white-space:pre-wrap;overflow-wrap:anywhere}
+.empty{padding:40px 0;color:var(--mute)}
+.mail{margin-top:32px;padding:20px;background:var(--plane);border-radius:8px}
+.mail .grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));margin-bottom:12px}
+#mailtxt{height:300px;font-size:15px;background:var(--bg)}
+#copied{font-size:14px;font-weight:500}
+@media(max-width:600px){.ck{grid-template-columns:minmax(0,1fr)}.fig{width:100%;justify-content:space-between}.fig div{text-align:left}}
+@media(prefers-reduced-motion:no-preference){.ck{animation:in .25s ease both}@keyframes in{from{opacity:0;transform:translateY(4px)}}}
+</style>
+</head>
+<body>
+<header class="band"><div class="wrap">
+  <h1>Submission completeness check</h1>
+  <p class="lede">Pre-screen for <i>Vaccines</i> manuscripts: ethics approval, informed consent, trial registration, reporting guidelines, back-matter statements and author rules. Each line shows what was found so you can confirm it in seconds.</p>
+  <p class="priv"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="8" rx="1.5" fill="currentColor"/><path d="M5 7V5a3 3 0 0 1 6 0v2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>Runs entirely in this browser. Manuscript text is never uploaded or saved.</p>
+</div></header>
+
+<main class="band"><div class="wrap work">
+  <section class="in" aria-label="Manuscript input">
+    <label class="lab" for="ms">Manuscript text</label>
+    <textarea id="ms" spellcheck="false" placeholder="Paste the full manuscript text here, or drop a .docx file onto this box."></textarea>
+    <div class="row">
+      <label class="btn" for="file" style="display:inline-flex;align-items:center">Open .docx</label>
+      <input id="file" type="file" accept=".docx,.txt" hidden>
+      <button class="btn" id="sample" type="button">Load sample</button>
+      <button class="btn" id="clear" type="button">Clear</button>
+    </div>
+    <p class="note" id="fstat">For a PDF, open it, select all text and paste it here.</p>
+    <fieldset>
+      <legend>Study type</legend>
+      <p class="note" style="margin:0">Detected from the text. Click to correct; the checks update.</p>
+      <div class="chips" id="types"></div>
+    </fieldset>
+  </section>
+
+  <section aria-label="Check results">
+    <div id="out"></div>
+    <div class="mail" id="mailbox">
+      <h2>Request to authors</h2>
+      <div class="grid">
+        <div><label class="lab" for="mid">Manuscript ID</label><input type="text" id="mid" placeholder="vaccines-1234567"></div>
+        <div><label class="lab" for="who">Addressee</label><input type="text" id="who" placeholder="Dr. Ionescu"></div>
+        <div><label class="lab" for="sign">Sign-off</label><input type="text" id="sign" value="Vaccines Editorial Office"></div>
+      </div>
+      <textarea id="mailtxt" aria-label="Email to authors"></textarea>
+      <div class="row">
+        <button class="btn pri" id="copymail" type="button">Copy email</button>
+        <button class="btn" id="copysum" type="button">Copy internal summary</button>
+        <span id="copied" role="status"></span>
+      </div>
+      <p class="note">Ticked lines above go into the email. You can edit the text before copying.</p>
+    </div>
+  </section>
+</div></main>
+
+<script>
+{
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const cnt=(re,s)=>(s.match(re)||[]).length;
+
+const LAB={
+ irb:['Institutional Review Board Statement','Ethics Statement','Ethical Approval','Ethics Approval and Consent to Participate','Ethics Approval','Ethical Statement','Animal Ethics Statement','Ethics Declarations'],
+ consent:['Informed Consent Statement','Consent to Participate','Patient Consent','Consent for Publication'],
+ data:['Data Availability Statement','Availability of Data and Materials','Data Availability','Data Sharing Statement'],
+ coi:['Conflicts of Interest','Conflict of Interest','Competing Interests','Declaration of Competing Interest','Declaration of Interests','Disclosures'],
+ contrib:['Author Contributions',"Authors' Contributions",'CRediT Authorship Contribution Statement'],
+ funding:['Funding','Funding Statement','Financial Support','Funding Information'],
+ ack:['Acknowledgments','Acknowledgements'],
+ abbr:['Abbreviations'],supp:['Supplementary Materials'],refs:['References','Bibliography']
+};
+const norm=s=>s.toLowerCase().replace(/\s+/g,' ').replace(/’/g,"'");
+const KEYOF={},ALTS=[];
+for(const k in LAB)for(const l of LAB[k]){KEYOF[norm(l)]=k;ALTS.push(l)}
+ALTS.sort((a,b)=>b.length-a.length);
+const rx=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&').replace(/'/g,"['’]").replace(/ /g,'\\s+');
+const HRE=new RegExp('(^|\\n)[ \\t]*(?:\\d+(?:\\.\\d+)*\\.?[ \\t]*)?('+ALTS.map(rx).join('|')+')[ \\t]*(?:[:：.]|(?=\\n)|$)','gi');
+
+function parse(raw){
+  const t=raw.replace(/\r\n?/g,'\n');const hits=[];let m;HRE.lastIndex=0;
+  while((m=HRE.exec(t))){const key=KEYOF[norm(m[2])];if(key)hits.push({key,start:m.index+m[1].length,end:HRE.lastIndex});if(!m[0].length)HRE.lastIndex++}
+  const S={};let refs=t.length;
+  hits.forEach((h,i)=>{if(h.key==='refs'){refs=h.start;return}const stop=i+1<hits.length?hits[i+1].start:Math.min(t.length,h.end+3000);const b=t.slice(h.end,stop).trim().slice(0,3000);if(b)S[h.key]=b});
+  return {t,S,D:t.slice(0,refs),front:t.slice(0,6000)};
+}
+
+function detect({D}){
+  const review=cnt(/\b(systematic review|meta-analys[ie]s|scoping review|narrative review|literature review|umbrella review|this review)\b/gi,D)>=2;
+  const primary=/\b(were|was) (recruited|enrolled|randomi[sz]ed|immuni[sz]ed|vaccinated|invited|surveyed|inoculated|challenged|interviewed)\b/i.test(D);
+  const g=!review||primary;
+  const trial=g&&cnt(/\b(randomi[sz]ed|placebo[- ]controlled|phase (?:i{1,3}v?|iv|[1-4])[ab]?\b|clinical trial|double[- ]blind(?:ed)?|open[- ]label)/gi,D)>=2;
+  const survey=g&&cnt(/\b(questionnaires?|surveys?|cross-sectional|hesitancy|interviews?|focus groups?|likert)\b/gi,D)>=3;
+  const human=trial||survey||(g&&cnt(/\b(patients?|participants?|volunteers?|respondents?|healthcare workers?|recruited|enrolled|cohort|pregnant women|blood samples?|serum samples?|sera from|donors?)\b/gi,D)>=4);
+  const animal=g&&cnt(/\b(mice|mouse|rats?|rabbits?|ferrets?|macaques?|non-human primates?|hamsters?|guinea pigs?|piglets?|pigs|cattle|calves|chickens?|sheep|animals?)\b/gi,D)>=3;
+  return {human,survey,animal,trial,review};
+}
+
+const NA=s=>/^\s*(not applicable|n\/?a)\b/i.test(s)||(s.length<60&&/not applicable/i.test(s));
+const tokens=s=>(s.match(/[A-Za-z0-9][\w\-\/.()]*\d[\w\-\/.()]*/g)||[]).map(x=>x.replace(/[.()]+$/,'')).filter(x=>x.length>=3&&!/^(19|20)\d{2}$/.test(x)&&!/^\d{1,4}[\/.\-]\d{1,2}[\/.\-]\d{1,4}$/.test(x)&&!/^\d{1,2}(st|nd|rd|th)$/.test(x));
+const MON='(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\.?';
+const DATE=new RegExp('\\b\\d{1,2}(st|nd|rd|th)?\\s+'+MON+',?\\s+(19|20)\\d{2}\\b|\\b'+MON+'\\s+\\d{1,2}(st|nd|rd|th)?,?\\s+(19|20)\\d{2}\\b|\\b(19|20)\\d{2}[\\/.\\-]\\d{1,2}[\\/.\\-]\\d{1,2}\\b|\\b\\d{1,2}[\\/.\\-]\\d{1,2}[\\/.\\-](19|20)\\d{2}\\b|\\b'+MON+'\\s+(19|20)\\d{2}\\b','i');
+function who(T){const a=[];if(T.trial)a.push('clinical trial participants');else if(T.survey)a.push('questionnaire respondents');else if(T.human)a.push('human participants or samples');if(T.animal)a.push('animals');return a.join(' and ')||'human participants or animals'}
+const R=(id,title)=>({id,title,st:'ok',notes:[],req:[]});
+
+function cIRB({S,D},T){
+  const r=R('irb','Institutional Review Board statement'),s=S.irb,need=T.human||T.survey||T.animal||T.trial;r.ex=s;
+  if(!s){
+    if(need){r.st='miss';r.notes.push(`No IRB or ethics statement found, but the study appears to involve ${who(T)}.`);r.req.push(`Please add an Institutional Review Board Statement giving the name of the approving ethics committee${T.animal?' (for animal work, the animal ethics committee or IACUC)':''}, the approval code and the date of approval.`)}
+    else if(T.review){r.st='na';r.notes.push('Review article: "Not applicable." is acceptable here.')}
+    else{r.st='warn';r.notes.push('Section not found. Even without humans or animals, authors should state "Not applicable."');r.req.push('Please add an Institutional Review Board Statement (state "Not applicable." if the study did not involve humans or animals).')}
+    return r}
+  if(NA(s)){
+    if(need){r.st='miss';r.notes.push(`Statement says "Not applicable", but the study appears to involve ${who(T)}.`);if(T.survey)r.notes.push('Questionnaire and survey studies still need ethics approval, or an exemption issued by a committee.');r.req.push(`As the study involves ${who(T)}, "Not applicable" cannot be accepted in the Institutional Review Board Statement. Please give the name of the ethics committee, the approval code and the date of approval${T.survey?'. If the study was exempted from review, please name the committee that granted the exemption and give its reference':''}.`)}
+    else r.notes.push('"Not applicable", and no human or animal involvement detected.');
+    return r}
+  const miss=[];
+  if(!/ethic|review board|\bIRB\b|committee|IACUC|animal (care|welfare)|council|board/i.test(s))miss.push('name of the ethics committee');
+  if(!tokens(s).length)miss.push('approval code');
+  if(!DATE.test(s))miss.push('date of approval');
+  if(miss.length){r.st='warn';r.notes.push('Not found in the statement: '+miss.join(', ')+'.');r.req.push(`Please complete the Institutional Review Board Statement with the ${miss.join(', ')}.`)}
+  else r.notes.push('Committee, approval code and date all appear to be present.');
+  if(/exempt|waiv/i.test(s)){r.st='warn';r.notes.push('Exemption or waiver claimed: confirm it was issued by a committee, not self-declared.');r.req.push('The ethics statement mentions an exemption. Please name the committee that granted it and give the reference number.')}
+  if(T.human&&!/helsinki/i.test(D))r.notes.push('No mention of the Declaration of Helsinki.');
+  if(T.animal&&!/ARRIVE|directive 2010\/63|guide for the care|animal welfare act|3Rs/i.test(D))r.notes.push('No animal welfare guideline (ARRIVE, Directive 2010/63/EU or similar) mentioned.');
+  return r}
+
+function cConsent({S,D},T){
+  const r=R('consent','Informed consent statement'),s=S.consent,need=T.human||T.survey||T.trial;r.ex=s;
+  const ask='Please add an Informed Consent Statement confirming that informed consent was obtained from all participants, or explain why consent was waived and name the committee that approved the waiver.';
+  if(!s){if(need){r.st='miss';r.notes.push('No consent statement found for a study with '+who(T)+'.');r.req.push(ask)}else if(T.review){r.st='na';r.notes.push('Review article: "Not applicable." is acceptable.')}else{r.st='warn';r.notes.push('Section not found.');r.req.push('Please add an Informed Consent Statement (state "Not applicable." if no humans were involved).')}return r}
+  if(NA(s)){if(need){r.st='miss';r.notes.push('Says "Not applicable", but the study involves '+who(T)+'.');r.req.push(ask)}else r.notes.push('"Not applicable", and no human participants detected.');return r}
+  if(/waiv|exempt|retrospective|anonymi[sz]ed|de-identified/i.test(s)&&!/committee|board|IRB|ethic/i.test(s)){r.st='warn';r.notes.push('Waiver claimed without naming the committee that approved it.');r.req.push('The Informed Consent Statement mentions a waiver. Please name the committee that approved it.')}
+  else if(!/consent (was|were|has been|had been) (obtained|provided|given|collected)|(provided|gave|signed|obtained)( written| oral| verbal| informed| electronic)* (informed )?consent|consented|agreed to participate/i.test(s)){r.st='warn';r.notes.push('Does not clearly confirm that consent was obtained.');r.req.push('Please state clearly in the Informed Consent Statement that informed consent was obtained from all participants.')}
+  else r.notes.push('Confirms that consent was obtained.');
+  if(/\b(children|child|minors?|adolescents?|infants?|neonates?|newborns?|pediatric|paediatric|under 18)\b/i.test(D)&&!/parent|guardian|legal(ly)? (authori[sz]ed )?representative/i.test(s)){r.st='warn';r.notes.push('Minors appear in the study, but parental or guardian consent is not mentioned.');r.req.push('As the study includes minors, please confirm that consent was obtained from parents or legal guardians (and assent from the children where applicable).')}
+  if(/\bcase (report|series)\b/i.test(D)&&!/publi(sh|cation)/i.test(s)){r.st='warn';r.notes.push('Case report: consent to publish is not mentioned.');r.req.push('For a case report, please confirm that written informed consent to publish this paper was obtained from the patient(s).')}
+  return r}
+
+const REG=[['ClinicalTrials.gov',/\bNCT\s?\d{8}\b/gi],['ChiCTR',/\bChiCTR[-\s]?[A-Z]{0,4}-?\d{6,12}\b/gi],['ISRCTN',/\bISRCTN\s?\d{8}\b/gi],['EU CTR',/\b20\d{2}-5\d{5}-\d{2}-\d{2}\b/g],['EudraCT',/\b(19|20)\d{2}-\d{6}-\d{2}\b/g],['CTRI',/\bCTRI\/\d{4}\/\d{2,3}\/\d{6}\b/gi],['ANZCTR',/\bACTRN\d{14}\b/gi],['DRKS',/\bDRKS\d{8}\b/gi],['jRCT',/\bjRCT\d{10}\b/gi],['PACTR',/\bPACTR\d{15}\b/gi],['IRCT',/\bIRCT\d{8,}N\d+\b/gi],['TCTR',/\bTCTR\d{11}\b/gi],['CRiS',/\bKCT\d{7}\b/gi]];
+function cTrial({D},T){
+  const r=R('trial','Clinical trial registration');const ids=[];
+  for(const[n,re]of REG)for(const x of new Set(D.match(re)||[]))ids.push(`${x} (${n})`);
+  r.ex=ids.length?ids.join('\n'):'';
+  if(T.trial){if(ids.length)r.notes.push('Registration number found: '+ids.join(', ')+'. Check that it belongs to this study and whether registration was prospective.');
+    else{r.st='miss';r.notes.push('Looks like a clinical trial, but no registry number was found.');r.req.push('This manuscript appears to report a clinical trial. Please provide the trial registration number, the registry (e.g., ClinicalTrials.gov, ChiCTR, ISRCTN or EU CTR) and the registration date, and add it to the Abstract and the Methods.')}}
+  else{r.st='na';r.notes.push(ids.length?'Not detected as a trial, but registry numbers appear: '+ids.join(', ')+'.':'No clinical trial detected.')}
+  return r}
+
+function cGuide({D},T){
+  const r=R('guide','Reporting guideline');const need=[];
+  if(T.trial&&/randomi[sz]ed/i.test(D))need.push(['CONSORT',/CONSORT/]);
+  if(T.review&&/systematic review|meta-analys/i.test(D))need.push(['PRISMA',/PRISMA/]);
+  if(T.animal)need.push(['ARRIVE',/ARRIVE/]);
+  if(T.human&&!T.trial)need.push(['STROBE',/STROBE|CHERRIES|RECORD\b/]);
+  if(!need.length){r.st='na';r.notes.push('No guideline expected for the detected study type.');return r}
+  const lack=need.filter(([,re])=>!re.test(D)).map(([n])=>n),have=need.filter(([,re])=>re.test(D)).map(([n])=>n);
+  if(have.length)r.notes.push('Mentioned: '+have.join(', ')+'.');
+  if(lack.length){r.st='warn';r.notes.push('Expected but not mentioned: '+lack.join(', ')+'.');r.req.push(`Please state whether the study follows the ${lack.join(' and ')} reporting guideline and provide the completed checklist as Supplementary Material.`)}
+  if(T.review&&/systematic review|meta-analys/i.test(D)&&!/\bCRD\s?4\d{10}\b/i.test(D))r.notes.push('No PROSPERO registration (CRD...) found for the systematic review.');
+  return r}
+
+function cData({S,D},T){
+  const r=R('data','Data availability statement'),s=S.data;r.ex=s;
+  if(!s){r.st='miss';r.notes.push('Section not found.');r.req.push('Please add a Data Availability Statement explaining where the data supporting the results can be found (for example, a public repository with accession numbers, or availability on request with the reason).');return r}
+  const orig=!T.review;
+  if(NA(s)){if(orig){r.st='warn';r.notes.push('Says "Not applicable", but the study reports original data.');r.req.push('The Data Availability Statement reads "Not applicable", but the study reports original data. Please state where the data can be accessed.')}else r.notes.push('"Not applicable" for a review.');return r}
+  if(/(upon|on) (reasonable )?request|from the corresponding author|contact the author/i.test(s))r.notes.push('Data available on request: acceptable under MDPI policy, but consider whether a public repository is expected.');
+  else r.notes.push('Statement present.');
+  if(/\b(sequenc(ing|ed)|whole[- ]genome|genom(e|ic) data|RNA-seq|phylogenetic)\b/i.test(D)&&!/(GenBank|\bENA\b|DDBJ|GISAID|\bSRA\b|\bGEO\b|accession|PRJ(NA|EB)\d|SRR\d|GSE\d|EPI_ISL)/i.test(s+D)){r.st='warn';r.notes.push('Sequence data reported but no public accession number found.');r.req.push('The study reports sequence data. Please deposit the sequences in a public database (e.g., GenBank, ENA or GISAID) and give the accession numbers in the Data Availability Statement.')}
+  return r}
+
+const MANU=/\b(Pfizer|BioNTech|Moderna|AstraZeneca|GSK|GlaxoSmithKline|Sanofi|Merck|MSD|Janssen|Johnson & Johnson|Novavax|Sinovac|Sinopharm|CanSino|Bharat Biotech|Serum Institute|Valneva|Bavarian Nordic|Seqirus|Takeda|Zydus|Walvax|Zhifei|Clover Biopharmaceuticals|Medicago|Dynavax|Emergent BioSolutions|Biological E)\b/g;
+const CORP=/\b[A-Z][\w&\-]*(?:\s[A-Z][\w&\-]*){0,4},?\s(?:Inc|Ltd|LLC|GmbH|AG|PLC|Limited|Corp|Corporation|S\.A|S\.p\.A|B\.V|Co\.,?\s?Ltd)\b\.?/g;
+const NOFUND=/(did not receive|received no|no external|no specific|without (any )?(external )?funding|not funded|no funding)/i;
+function cCOI({S,front},T){
+  const r=R('coi','Conflicts of interest'),s=S.coi;r.ex=s;
+  if(!s){r.st='miss';r.notes.push('Section not found.');r.req.push('Please add a Conflicts of Interest statement. If there are none, state "The authors declare no conflicts of interest."');return r}
+  const scope=front+'\n'+(S.funding||'')+'\n'+(S.ack||'');
+  const ents=[...new Set([...(scope.match(MANU)||[]),...(scope.match(CORP)||[]).map(x=>x.replace(/\.$/,''))])];
+  const none=/no (known )?(conflicts?|competing)|nothing to disclose|no (financial|personal) (interests?|relationships?)/i.test(s);
+  if(ents.length&&none){r.st='warn';r.notes.push('Companies appear in affiliations, funding or acknowledgments ('+ents.join(', ')+'), yet no conflicts are declared.');r.req.push(`${ents.join(', ')} appear${ents.length>1?'':'s'} in the affiliations, funding or acknowledgments. Please confirm whether this represents a potential conflict of interest and update the Conflicts of Interest statement accordingly.`)}
+  if(S.funding&&!NOFUND.test(S.funding)&&!/funder|sponsor|had no role|no role in/i.test(s)){r.st='warn';r.notes.push('The study is funded, but the role of the funders is not stated.');r.req.push('Please state the role of the funders in the Conflicts of Interest section, for example: "The funders had no role in the design of the study; in the collection, analyses, or interpretation of data; in the writing of the manuscript; or in the decision to publish the results."')}
+  if(r.st==='ok')r.notes.push(ents.length?'Commercial entities found and addressed in the statement: '+ents.join(', ')+'.':'Statement present; no commercial entities detected.');
+  return r}
+
+function cFund({S}){
+  const r=R('funding','Funding'),s=S.funding;r.ex=s;
+  if(!s){r.st='miss';r.notes.push('Section not found.');r.req.push('Please add a Funding section listing each funder with its grant number, or state "This research received no external funding."');return r}
+  if(NOFUND.test(s)){r.notes.push('No external funding declared.');return r}
+  if(!tokens(s).length){r.st='warn';r.notes.push('Funder named, but no grant or project number found.');r.req.push('Please give the grant or project number for each funder in the Funding section.')}
+  else r.notes.push('Funder and grant number(s) present.');
+  return r}
+
+const CREDIT=['conceptuali[sz]ation','methodology','software','validation','formal analysis','investigation','resources','data curation','original draft','review (and|&) editing','visuali[sz]ation','supervision','project administration','funding acquisition'];
+function cContrib({S}){
+  const r=R('contrib','Author contributions'),s=S.contrib;r.ex=s;
+  if(!s){r.st='miss';r.notes.push('Section not found.');r.req.push('Please add an Author Contributions section using CRediT roles (e.g., Conceptualization, Methodology, Investigation, Writing, original draft preparation) with author initials.');return r}
+  const n=CREDIT.filter(p=>new RegExp(p,'i').test(s)).length,ini=new Set(s.match(/\b[A-Z]\.(?:-?[A-Z]\.){1,3}/g)||[]);
+  r.notes.push(`${n} CRediT role${n===1?'':'s'} and ${ini.size} distinct author initial${ini.size===1?'':'s'} found. Compare the initials with the author list.`);
+  if(n<3){r.st='warn';r.req.push('Please rewrite the Author Contributions using CRediT roles with author initials.')}
+  if(!/all authors have read and agreed/i.test(s)){r.st='warn';r.notes.push('Missing the sentence "All authors have read and agreed to the published version of the manuscript."');r.req.push('Please add the sentence "All authors have read and agreed to the published version of the manuscript." to the Author Contributions.')}
+  return r}
+
+function cAuthors({front}){
+  const r=R('authors','Co-first and corresponding authors');
+  const eq=front.match(/[^\n]*(contributed equally|equal(ly)? contribut|equal contribution|co-first|joint first|share[ds]? (the )?first authorship)[^\n]*/i);
+  if(eq){const line=eq[0].trim(),before=front.slice(0,front.indexOf(eq[0]));r.ex=line;
+    const sym=(line.match(/^[†‡§#¶]+/)||[])[0];let n=sym?before.split(sym).length-1:(line.match(/\b[A-Z]\.(?:-?[A-Z]\.)+/g)||[]).length;
+    if(n>=3){r.st='miss';r.notes.push(`${n} authors appear to be marked as contributing equally. Vaccines allows at most two co-first authors.`);r.req.push(`The manuscript marks ${n} authors as contributing equally. Vaccines generally accepts at most two co-first authors; please reduce this to two, or provide a justification for the editor's consideration.`)}
+    else if(n>0)r.notes.push(`${n} co-first author${n>1?'s':''} marked: within the limit of two.`);
+    else{r.st='warn';r.notes.push('Equal-contribution note found, but the number of authors could not be counted. Check manually.')}}
+  else r.notes.push('No equal-contribution note found.');
+  const c=front.match(/Correspondence[\s\S]{0,400}/i);
+  if(c){const seg=c[0].split(/\n\s*\n/)[0],em=new Set(seg.match(/[\w.+-]+@[\w-]+\.[\w.-]*\w/g)||[]);r.ex=(r.ex?r.ex+'\n':'')+seg.trim();
+    if(em.size>2){if(r.st==='ok')r.st='warn';r.notes.push(`${em.size} corresponding author emails found. The limit is two.`);r.req.push(`The manuscript lists ${em.size} corresponding authors. Vaccines allows at most two; please revise.`)}
+    else r.notes.push(`${em.size||'No'} corresponding author email${em.size===1?'':'s'} found.`)}
+  else r.notes.push('No "Correspondence" line found in the front matter.');
+  return r}
+
+function cAI({D,S}){
+  const r=R('ai','Generative AI disclosure');const hits=[...new Set((D.match(/\b(ChatGPT|GPT-?4o?|GPT-?3\.5|generative AI|large language models?|LLMs?|Claude|Gemini|Copilot|DeepSeek|QuillBot|Perplexity|ERNIE Bot|Kimi)\b/g)||[]))];
+  if(!hits.length){r.st='na';r.notes.push('No generative AI tools mentioned.');return r}
+  const ok=new RegExp('('+hits.map(h=>h.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|')+')[^.]{0,160}\\b(to|for) (improve|edit|polish|check|translat|generat|assist|draft|proofread|summari)','i').test(D);
+  r.ex=hits.join(', ');
+  if(ok)r.notes.push('AI tools mentioned with a stated purpose ('+hits.join(', ')+'). Confirm the tool version is given and that AI is not listed as an author.');
+  else{r.st='warn';r.notes.push('AI tools mentioned ('+hits.join(', ')+') without a clear description of how they were used.');r.req.push('Please describe how generative AI tools were used in preparing the manuscript, including the tool name, version and purpose, in the Methods or Acknowledgments.')}
+  return r}
+
+const CHECKS=[cIRB,cConsent,cTrial,cGuide,cData,cCOI,cFund,cContrib,cAuthors,cAI];
+const STL={ok:'OK',warn:'Check',miss:'Action needed',na:'Not applicable'};
+const TYPES=[['human','Human participants or samples'],['survey','Questionnaire or survey'],['animal','Animal experiments'],['trial','Clinical trial'],['review','Review article']];
+let P=null,T={},res=[],excl=new Set();
+
+function run(changed){
+  const v=$('#ms').value;
+  if(changed){excl=new Set();if(v.trim()){P=parse(v);T=detect(P)}else{P=null;T={}}}
+  $('#types').innerHTML=TYPES.map(([k,l])=>`<button type="button" class="chip-t" data-k="${k}" aria-pressed="${!!T[k]}">${l}</button>`).join('');
+  if(!P){res=[];$('#out').innerHTML='<p class="empty">Paste a manuscript or open a .docx file to start the check.</p>';mail();return}
+  res=CHECKS.map(f=>f(P,T));
+  const n=s=>res.filter(r=>r.st===s).length,m=n('miss'),w=n('warn'),o=n('ok');
+  const head=m?`${m} item${m>1?'s':''} need${m>1?'':'s'} action before review`:w?`No blocking gaps; ${w} line${w>1?'s':''} to check`:'Back matter looks complete';
+  $('#out').innerHTML=`<div class="sum"><p class="h">${head}</p><div class="fig"><div class="m"><b>${m}</b><span>Action needed</span></div><div><b>${w}</b><span>Check</span></div><div><b>${o}</b><span>OK</span></div></div></div>
+  <ol class="sheet">${res.map(r=>`<li class="ck s-${r.st}"><span class="st">${STL[r.st]}</span><div><h3>${esc(r.title)}</h3><ul>${r.notes.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>${r.req.length&&(r.st==='miss'||r.st==='warn')?`<label class="inc"><input type="checkbox" data-id="${r.id}" ${excl.has(r.id)?'':'checked'}> Include in author email</label>`:''}${r.ex?`<details><summary>Text found</summary><p class="ex">${esc(r.ex.slice(0,600))}</p></details>`:''}</div></li>`).join('')}</ol>`;
+  mail()}
+
+function mail(){
+  const items=res.filter(r=>(r.st==='miss'||r.st==='warn')&&r.req.length&&!excl.has(r.id)).flatMap(r=>r.req);
+  const id=$('#mid').value.trim(),w=$('#who').value.trim(),sg=$('#sign').value.trim()||'Vaccines Editorial Office';
+  $('#mailtxt').value=!items.length?'':`Dear ${w||'Authors'},
+
+Thank you for submitting your manuscript${id?` (${id})`:''} to Vaccines. Before we can proceed with peer review, please address the following points:
+
+${items.map((x,i)=>`${i+1}. ${x}`).join('\n\n')}
+
+Please revise the manuscript accordingly and upload the revised version together with a brief response to each point.
+
+Kind regards,
+${sg}`;
+  $('#mailtxt').placeholder=P?'No requests to send: nothing is ticked.':'The email appears here after a check.'}
+
+async function copy(txt,el){
+  try{await navigator.clipboard.writeText(txt);$('#copied').textContent='Copied.'}
+  catch(e){if(el){el.focus();el.select()}$('#copied').textContent='Press Ctrl+C (or Cmd+C) to copy the selected text.'}
+  setTimeout(()=>{$('#copied').textContent=''},3000)}
+
+let tm;$('#ms').addEventListener('input',()=>{clearTimeout(tm);$('#fstat').textContent='For a PDF, open it, select all text and paste it here.';tm=setTimeout(()=>run(true),350)});
+$('#types').addEventListener('click',e=>{const b=e.target.closest('[data-k]');if(!b||!P)return;T[b.dataset.k]=!T[b.dataset.k];run(false)});
+$('#out').addEventListener('change',e=>{const c=e.target.closest('input[data-id]');if(!c)return;c.checked?excl.delete(c.dataset.id):excl.add(c.dataset.id);mail()});
+for(const i of ['#mid','#who','#sign'])$(i).addEventListener('input',mail);
+try{const s=localStorage.getItem('cc-sign');if(s)$('#sign').value=s}catch(e){}
+$('#sign').addEventListener('change',()=>{try{localStorage.setItem('cc-sign',$('#sign').value)}catch(e){}});
+$('#copymail').addEventListener('click',()=>{const v=$('#mailtxt').value;if(v)copy(v,$('#mailtxt'));else $('#copied').textContent='Nothing to copy yet.'});
+$('#copysum').addEventListener('click',()=>{if(!res.length){$('#copied').textContent='Nothing to copy yet.';return}copy([`Completeness check${$('#mid').value.trim()?' '+$('#mid').value.trim():''}`,...res.map(r=>`[${STL[r.st]}] ${r.title}: ${r.notes.join(' ')}`)].join('\n'),null)});
+$('#clear').addEventListener('click',()=>{$('#ms').value='';$('#fstat').textContent='Cleared.';run(true);$('#ms').focus()});
+
+let mam=null;
+function loadMammoth(){return mam||(mam=new Promise((ok,no)=>{const s=document.createElement('script');s.src='mammoth.browser.min.js';s.onload=()=>ok(window.mammoth);s.onerror=()=>{mam=null;no(new Error('load'))};document.head.appendChild(s)}))}
+async function readFile(f){
+  const st=$('#fstat'),name=f.name.toLowerCase();
+  if(name.endsWith('.pdf')){st.textContent='PDF files cannot be read here. Open the PDF, select all text and paste it.';return}
+  if(name.endsWith('.doc')){st.textContent='Old .doc format is not supported. Save it as .docx in Word, or paste the text.';return}
+  try{st.textContent='Reading '+f.name+' in this browser...';let txt;
+    if(name.endsWith('.docx')){const m=await loadMammoth();txt=(await m.extractRawText({arrayBuffer:await f.arrayBuffer()})).value}else txt=await f.text();
+    $('#ms').value=txt;st.textContent=f.name+' read locally ('+txt.length.toLocaleString()+' characters).';run(true)}
+  catch(e){st.textContent='Could not read '+f.name+'. Try pasting the text instead.'}}
+$('#file').addEventListener('change',e=>{const f=e.target.files[0];if(f)readFile(f);e.target.value=''});
+const ms=$('#ms');
+ms.addEventListener('dragover',e=>{e.preventDefault();ms.classList.add('drag')});
+ms.addEventListener('dragleave',()=>ms.classList.remove('drag'));
+ms.addEventListener('drop',e=>{e.preventDefault();ms.classList.remove('drag');const f=e.dataTransfer.files[0];if(f)readFile(f)});
+
+const SAMPLE=`Hesitancy towards HPV Vaccination among Primary Healthcare Workers in Two European Cities: A Cross-Sectional Survey
+
+Ana Petrescu 1,†, Milan Jovic 2,†, Ewa Nowak 1,† and Daniel Ionescu 1,*
+
+1 Department of Public Health, Faculty of Medicine, Riverside University, Bucharest, Romania
+2 Institute of Epidemiology, Belgrade, Serbia
+* Correspondence: d.ionescu@riverside.example
+† These authors contributed equally to this work.
+
+Abstract: Healthcare workers strongly influence vaccine uptake. We assessed HPV vaccine hesitancy among primary healthcare workers. An online questionnaire was distributed through professional networks; 412 respondents completed the survey. Hesitancy was associated with concerns about safety and limited training.
+
+Keywords: HPV vaccine; vaccine hesitancy; healthcare workers; survey
+
+1. Introduction
+Vaccine hesitancy among healthcare workers remains a barrier to HPV vaccination programmes.
+
+2. Materials and Methods
+2.1. Study Design and Participants
+A cross-sectional survey was conducted between March and June 2025. Participants were recruited through regional medical associations. The questionnaire comprised 34 items rated on a five-point Likert scale.
+2.2. Statistical Analysis
+Associations between participant characteristics and hesitancy were assessed with logistic regression.
+
+3. Results
+A total of 412 respondents completed the questionnaire. Of the participants, 38% reported at least one concern about vaccine safety.
+
+4. Discussion
+Hesitancy among healthcare workers may be reduced through targeted training.
+
+Author Contributions: Conceptualization, A.P. and D.I.; methodology, M.J.; formal analysis, E.N.; writing, original draft preparation, A.P.; writing, review and editing, D.I.
+
+Funding: This research was funded by Northbridge Biologics Ltd.
+
+Institutional Review Board Statement: Not applicable.
+
+Informed Consent Statement: Informed consent was obtained from all subjects involved in the study.
+
+Data Availability Statement: The data presented in this study are available on request from the corresponding author.
+
+Conflicts of Interest: The authors declare no conflicts of interest.
+
+References
+1. Example reference on vaccine hesitancy.`;
+$('#sample').addEventListener('click',()=>{ms.value=SAMPLE;$('#fstat').textContent='Sample manuscript loaded (fictional, for demonstration).';run(true)});
+ms.value=SAMPLE;$('#fstat').textContent='Sample manuscript loaded (fictional, for demonstration).';run(true);
+}
+</script>
+</body>
+</html>
