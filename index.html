@@ -64,10 +64,11 @@ ol.sheet{list-style:none;margin:0;padding:0}
 details{margin-top:6px;font-size:14px}
 summary{cursor:pointer;color:var(--mute);min-height:28px}
 .ex{margin:6px 0 0;padding:10px 12px;background:var(--field);border-radius:6px;white-space:pre-wrap;overflow-wrap:anywhere}
+.adv{margin:10px 0 4px;padding:12px 14px;border:1px solid var(--line);border-radius:6px;font-size:15px}.adv p{margin:0 0 6px}.adv .ex{margin:0;background:var(--field)}.adv .fx{margin:0 0 4px}
 .empty{padding:40px 0;color:var(--mute)}
 .mail{margin-top:32px;padding:20px;background:var(--plane);border-radius:8px}
 .mail .grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));margin-bottom:12px}
-#mailtxt{height:300px;font-size:15px;background:var(--bg)}
+#mailtxt{height:420px;font-size:15px;background:var(--bg)}
 #copied{font-size:14px;font-weight:500}
 @media(max-width:600px){.ck{grid-template-columns:minmax(0,1fr)}.fig{width:100%;justify-content:space-between}.fig div{text-align:left}}
 @media(prefers-reduced-motion:no-preference){.ck{animation:in .25s ease both}@keyframes in{from{opacity:0;transform:translateY(4px)}}}
@@ -113,6 +114,7 @@ summary{cursor:pointer;color:var(--mute);min-height:28px}
         <button class="btn" id="copysum" type="button">Copy internal summary</button>
         <span id="copied" role="status"></span>
       </div>
+      <label class="inc"><input type="checkbox" id="why" checked> Explain why each IRB and consent item is a problem</label>
       <p class="note">Ticked lines above go into the email. You can edit the text before copying.</p>
     </div>
   </section>
@@ -167,38 +169,100 @@ const DATE=new RegExp('\\b\\d{1,2}(st|nd|rd|th)?\\s+'+MON+',?\\s+(19|20)\\d{2}\\
 function who(T){const a=[];if(T.trial)a.push('clinical trial participants');else if(T.survey)a.push('questionnaire respondents');else if(T.human)a.push('human participants or samples');if(T.animal)a.push('animals');return a.join(' and ')||'human participants or animals'}
 const R=(id,title)=>({id,title,st:'ok',notes:[],req:[]});
 
+const MI={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+const mi=s=>MI[s.slice(0,3).toLowerCase()];
+const fmt=d=>['January','February','March','April','May','June','July','August','September','October','November','December'][d.m]+' '+d.y;
+function approvalDate(s){
+  let m=s.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?,?\s+((?:19|20)\d{2})\b/i);if(m)return{y:+m[3],m:mi(m[2])};
+  m=s.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+((?:19|20)\d{2})\b/i);if(m)return{y:+m[3],m:mi(m[1])};
+  m=s.match(/\b((?:19|20)\d{2})[-\/.](\d{1,2})[-\/.]\d{1,2}\b/);if(m&&+m[2]>=1&&+m[2]<=12)return{y:+m[1],m:+m[2]-1};
+  m=s.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+((?:19|20)\d{2})\b/i);if(m)return{y:+m[2],m:mi(m[1])};
+  return null}
+function studyStart(D){
+  const M='(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\.?';const ctx=/(conduct|recruit|enrol|collect|carried out|performed|distribut|survey|administer|study period|data were|sampl|vaccinat|immuni)/i;
+  const out=[];let m;
+  const r1=new RegExp('\\b(?:between|from)\\s+(?:\\d{1,2}(?:st|nd|rd|th)?\\s+)?'+M+',?\\s*((?:19|20)\\d{2})?\\s*(?:and|to|until|through|\\u2013|-)\\s*(?:\\d{1,2}(?:st|nd|rd|th)?\\s+)?'+M+',?\\s*((?:19|20)\\d{2})','gi');
+  while((m=r1.exec(D)))if(ctx.test(D.slice(Math.max(0,m.index-220),m.index+40)))out.push({y:+(m[2]||m[4]),m:mi(m[1]),txt:m[0]});
+  const r2=new RegExp('\\b(?:from|since|starting(?: in)?|beginning(?: in)?|in|during)\\s+(?:\\d{1,2}(?:st|nd|rd|th)?\\s+)?'+M+',?\\s+((?:19|20)\\d{2})','gi');
+  while((m=r2.exec(D)))if(ctx.test(D.slice(Math.max(0,m.index-220),m.index+40)))out.push({y:+m[2],m:mi(m[1]),txt:m[0]});
+  out.sort((a,b)=>a.y*12+a.m-(b.y*12+b.m));return out[0]||null}
+
+const TPL={
+ human:'"The study was conducted in accordance with the Declaration of Helsinki and approved by the [name of the ethics committee or Institutional Review Board] of [institution] (protocol code [code]; date of approval [date])."',
+ animal:'"The animal study protocol was approved by the [name of the animal ethics committee or IACUC] of [institution] (protocol code [code]; date of approval [date]), and all procedures followed [guideline, e.g., the ARRIVE guidelines or Directive 2010/63/EU]."',
+ waive:'"Ethical review and approval were waived for this study by the [name of the ethics committee] of [institution] (reference [number]) because [reason, e.g., only fully anonymized data were collected]."',
+ consent:'"Informed consent was obtained from all subjects involved in the study."',
+ online:'"Informed consent was obtained electronically from all participants before they started the questionnaire. Participation was voluntary and anonymous."',
+ minor:'"Written informed consent was obtained from the parents or legal guardians of all participants under 18 years of age, and assent was obtained from the children."',
+ cwaive:'"Patient consent was waived by the [name of the ethics committee] (reference [number]) because [reason, e.g., the study used anonymized retrospective data]."',
+ oral:'"Oral informed consent was obtained from all participants, as approved by the [name of the ethics committee] (reference [number]), and was documented by [method]."',
+ pub:'"Written informed consent has been obtained from the patient(s) to publish this paper."'
+};
+const WHY_IRB='MDPI requires every study involving humans or animals to report the approving ethics committee, the approval code and the date of approval, so that editors and readers can verify that the research was ethically reviewed.';
+function irbTpl(T){const a=[];if(T.human||T.survey||T.trial||!T.animal)a.push(TPL.human);if(T.animal)a.push(TPL.animal);return a.join('\n')}
+
 function cIRB({S,D},T){
   const r=R('irb','Institutional Review Board statement'),s=S.irb,need=T.human||T.survey||T.animal||T.trial;r.ex=s;
+  const fixFull=`Please revise the Institutional Review Board Statement as follows, completing the parts in brackets:\n${irbTpl(T)}`;
+  const consentSaysYes=S.consent&&!NA(S.consent)&&/consent (was|were|has been) (obtained|provided|given)|(provided|gave|signed|obtained)[\w\s]{0,20}consent/i.test(S.consent);
   if(!s){
-    if(need){r.st='miss';r.notes.push(`No IRB or ethics statement found, but the study appears to involve ${who(T)}.`);r.req.push(`Please add an Institutional Review Board Statement giving the name of the approving ethics committee${T.animal?' (for animal work, the animal ethics committee or IACUC)':''}, the approval code and the date of approval.`)}
+    if(need){r.st='miss';r.notes.push(`No IRB or ethics statement found, but the study appears to involve ${who(T)}.`);
+      r.req.push({issue:`The manuscript has no Institutional Review Board Statement, although the study involves ${who(T)}.`,why:WHY_IRB,fix:fixFull.replace('revise','add')+`\nIf the study was formally exempted from review, use instead:\n${TPL.waive}`})}
     else if(T.review){r.st='na';r.notes.push('Review article: "Not applicable." is acceptable here.')}
-    else{r.st='warn';r.notes.push('Section not found. Even without humans or animals, authors should state "Not applicable."');r.req.push('Please add an Institutional Review Board Statement (state "Not applicable." if the study did not involve humans or animals).')}
+    else{r.st='warn';r.notes.push('Section not found. Even without humans or animals, authors should state "Not applicable."');r.req.push({issue:'The manuscript has no Institutional Review Board Statement.',why:'MDPI journals require this statement in every research article, so that it is clear whether ethics approval was needed.',fix:'If the study did not involve humans or animals, please add: "Institutional Review Board Statement: Not applicable."'})}
     return r}
-  if(NA(s)){
-    if(need){r.st='miss';r.notes.push(`Statement says "Not applicable", but the study appears to involve ${who(T)}.`);if(T.survey)r.notes.push('Questionnaire and survey studies still need ethics approval, or an exemption issued by a committee.');r.req.push(`As the study involves ${who(T)}, "Not applicable" cannot be accepted in the Institutional Review Board Statement. Please give the name of the ethics committee, the approval code and the date of approval${T.survey?'. If the study was exempted from review, please name the committee that granted the exemption and give its reference':''}.`)}
+  const selfEx=/not (required|necessary|needed|sought)|did not (require|need)|no (ethical|ethics) (approval|review) was|exempt from (ethical|ethics)/i.test(s)&&!/committee|board|IRB|IACUC/i.test(s);
+  if(NA(s)||selfEx){
+    if(need){r.st='miss';
+      r.notes.push(NA(s)?`Statement says "Not applicable", but the study appears to involve ${who(T)}.`:'Authors declare on their own that approval was not needed; no committee is named.');
+      const why=[WHY_IRB];
+      if(T.survey)why.push('Anonymous and online questionnaires are still research involving human participants. Whether such a study is exempt from review must be decided by an ethics committee, not by the authors.');
+      if(selfEx)why.push('A statement that approval "was not required" is only acceptable if it was the ethics committee that made this decision.');
+      if(consentSaysYes){why.push('In addition, your Informed Consent Statement confirms that consent was obtained from participants, which shows that the study did involve human participants.');r.notes.push('Contradiction: the consent statement says consent was obtained from participants.')}
+      r.req.push({issue:NA(s)?`The Institutional Review Board Statement reads "Not applicable", but the study involves ${who(T)}.`:'The Institutional Review Board Statement says that ethics approval was not required, but does not name a committee that made this decision.',
+        why:why.join(' '),
+        fix:`${fixFull}\nIf an ethics committee formally exempted the study from review, use instead:\n${TPL.waive}\nPlease also send the approval or exemption letter to the editorial office (it will not be published).`})}
     else r.notes.push('"Not applicable", and no human or animal involvement detected.');
     return r}
   const miss=[];
-  if(!/ethic|review board|\bIRB\b|committee|IACUC|animal (care|welfare)|council|board/i.test(s))miss.push('name of the ethics committee');
-  if(!tokens(s).length)miss.push('approval code');
-  if(!DATE.test(s))miss.push('date of approval');
-  if(miss.length){r.st='warn';r.notes.push('Not found in the statement: '+miss.join(', ')+'.');r.req.push(`Please complete the Institutional Review Board Statement with the ${miss.join(', ')}.`)}
+  if(!/ethic|review board|\bIRB\b|committee|IACUC|animal (care|welfare)|council|board/i.test(s))miss.push('the name of the ethics committee');
+  if(!tokens(s).length)miss.push('the approval code');
+  if(!DATE.test(s))miss.push('the date of approval');
+  if(miss.length){r.st='warn';r.notes.push('Not found in the statement: '+miss.join(', ')+'.');
+    r.req.push({issue:`The Institutional Review Board Statement does not give ${miss.join(', ').replace(/, ([^,]*)$/,' or $1')}.`,why:'Each item is needed to identify the approval: the committee name shows who approved the study, the approval code links it to the committee\'s records, and the date shows that approval was granted before the study began.',fix:fixFull})}
   else r.notes.push('Committee, approval code and date all appear to be present.');
-  if(/exempt|waiv/i.test(s)){r.st='warn';r.notes.push('Exemption or waiver claimed: confirm it was issued by a committee, not self-declared.');r.req.push('The ethics statement mentions an exemption. Please name the committee that granted it and give the reference number.')}
+  if(/exempt|waiv/i.test(s)&&!/committee|board|IRB|IACUC/i.test(s.match(/[^.]*(exempt|waiv)[^.]*/i)[0])){r.st='warn';r.notes.push('Exemption or waiver claimed without naming the committee that granted it.');
+    r.req.push({issue:'The statement mentions an exemption from ethical review but does not say which committee granted it.',why:'An exemption is valid only when it is granted by an ethics committee. The authors\' own view that a study is low risk is not sufficient.',fix:`Please revise the statement as follows:\n${TPL.waive}`})}
+  const ad=approvalDate(s),st=studyStart(D.replace(s,''));
+  if(ad&&st){r.notes.push(`Approval dated ${fmt(ad)}; study start found as "${st.txt}".`);
+    if(ad.y*12+ad.m>st.y*12+st.m){r.st='miss';r.notes.push('Approval appears to be dated after the study started.');
+      r.req.push({issue:`The ethics approval is dated ${fmt(ad)}, but the Methods state that the study started in ${fmt(st)} ("${st.txt}").`,why:'Ethics approval must be obtained before participants are recruited or data are collected. Approval granted after a study has started is generally not acceptable.',fix:'Please check both dates. If one of them is a typing error, please correct it. If approval was in fact obtained after the study began, please explain the circumstances in your response, as the editor will need to assess this.'})}}
   if(T.human&&!/helsinki/i.test(D))r.notes.push('No mention of the Declaration of Helsinki.');
   if(T.animal&&!/ARRIVE|directive 2010\/63|guide for the care|animal welfare act|3Rs/i.test(D))r.notes.push('No animal welfare guideline (ARRIVE, Directive 2010/63/EU or similar) mentioned.');
   return r}
 
+function cTplConsent(T,D){if(/\b(children|child|minors?|adolescents?|infants?|neonates?|newborns?|pediatric|paediatric|under 18)\b/i.test(D))return TPL.minor;return T.survey?TPL.online+'\nor, for paper questionnaires:\n'+TPL.consent:TPL.consent}
 function cConsent({S,D},T){
   const r=R('consent','Informed consent statement'),s=S.consent,need=T.human||T.survey||T.trial;r.ex=s;
-  const ask='Please add an Informed Consent Statement confirming that informed consent was obtained from all participants, or explain why consent was waived and name the committee that approved the waiver.';
-  if(!s){if(need){r.st='miss';r.notes.push('No consent statement found for a study with '+who(T)+'.');r.req.push(ask)}else if(T.review){r.st='na';r.notes.push('Review article: "Not applicable." is acceptable.')}else{r.st='warn';r.notes.push('Section not found.');r.req.push('Please add an Informed Consent Statement (state "Not applicable." if no humans were involved).')}return r}
-  if(NA(s)){if(need){r.st='miss';r.notes.push('Says "Not applicable", but the study involves '+who(T)+'.');r.req.push(ask)}else r.notes.push('"Not applicable", and no human participants detected.');return r}
-  if(/waiv|exempt|retrospective|anonymi[sz]ed|de-identified/i.test(s)&&!/committee|board|IRB|ethic/i.test(s)){r.st='warn';r.notes.push('Waiver claimed without naming the committee that approved it.');r.req.push('The Informed Consent Statement mentions a waiver. Please name the committee that approved it.')}
-  else if(!/consent (was|were|has been|had been) (obtained|provided|given|collected)|(provided|gave|signed|obtained)( written| oral| verbal| informed| electronic)* (informed )?consent|consented|agreed to participate/i.test(s)){r.st='warn';r.notes.push('Does not clearly confirm that consent was obtained.');r.req.push('Please state clearly in the Informed Consent Statement that informed consent was obtained from all participants.')}
+  const WHY='Informed consent is a basic requirement for research involving people (Declaration of Helsinki), and MDPI asks authors to state how it was obtained.';
+  const fix=`Please revise the Informed Consent Statement as follows:\n${cTplConsent(T,D)}\nIf consent was not obtained, an ethics committee must have approved a waiver; in that case use:\n${TPL.cwaive}`;
+  if(!s){if(need){r.st='miss';r.notes.push('No consent statement found for a study with '+who(T)+'.');r.req.push({issue:`The manuscript has no Informed Consent Statement, although the study involves ${who(T)}.`,why:WHY,fix:fix.replace('revise','add')})}
+    else if(T.review){r.st='na';r.notes.push('Review article: "Not applicable." is acceptable.')}
+    else{r.st='warn';r.notes.push('Section not found.');r.req.push({issue:'The manuscript has no Informed Consent Statement.',why:'MDPI journals require this statement in every research article.',fix:'If no human participants were involved, please add: "Informed Consent Statement: Not applicable."'})}
+    return r}
+  if(NA(s)){if(need){r.st='miss';r.notes.push('Says "Not applicable", but the study involves '+who(T)+'.');r.req.push({issue:`The Informed Consent Statement reads "Not applicable", but the study involves ${who(T)}.`,why:WHY+' "Not applicable" is only correct when no human participants, samples or personal data were involved.',fix})}
+    else r.notes.push('"Not applicable", and no human participants detected.');return r}
+  if(/waiv|exempt|retrospective|anonymi[sz]ed|de-identified/i.test(s)&&!/committee|board|IRB|ethic/i.test(s)){r.st='warn';r.notes.push('Waiver claimed without naming the committee that approved it.');
+    r.req.push({issue:'The Informed Consent Statement says consent was waived, but does not say who approved the waiver.',why:'Only an ethics committee can waive the requirement for informed consent; authors cannot decide this themselves.',fix:`Please revise the statement as follows:\n${TPL.cwaive}`})}
+  else if(/\b(oral|verbal)\b/i.test(s)&&!/committee|board|IRB|ethic/i.test(s)){r.st='warn';r.notes.push('Oral or verbal consent, with no committee approval mentioned.');
+    r.req.push({issue:'The statement mentions oral (verbal) consent but does not say it was approved by the ethics committee.',why:'Oral consent is acceptable only when the ethics committee approved this procedure, and the way consent was recorded should be described.',fix:`Please revise the statement as follows:\n${TPL.oral}`})}
+  else if(!/consent (was|were|has been|had been) (obtained|provided|given|collected)|(provided|gave|signed|obtained)( written| oral| verbal| informed| electronic)* (informed )?consent|consented|agreed to participate/i.test(s)){r.st='warn';r.notes.push('Does not clearly confirm that consent was obtained.');
+    r.req.push({issue:'The Informed Consent Statement does not clearly state that consent was obtained from the participants.',why:'A statement that only describes the study, or says that consent "was not required", does not tell readers whether participants agreed to take part.',fix})}
   else r.notes.push('Confirms that consent was obtained.');
-  if(/\b(children|child|minors?|adolescents?|infants?|neonates?|newborns?|pediatric|paediatric|under 18)\b/i.test(D)&&!/parent|guardian|legal(ly)? (authori[sz]ed )?representative/i.test(s)){r.st='warn';r.notes.push('Minors appear in the study, but parental or guardian consent is not mentioned.');r.req.push('As the study includes minors, please confirm that consent was obtained from parents or legal guardians (and assent from the children where applicable).')}
-  if(/\bcase (report|series)\b/i.test(D)&&!/publi(sh|cation)/i.test(s)){r.st='warn';r.notes.push('Case report: consent to publish is not mentioned.');r.req.push('For a case report, please confirm that written informed consent to publish this paper was obtained from the patient(s).')}
+  if(/\b(children|child|minors?|adolescents?|infants?|neonates?|newborns?|pediatric|paediatric|under 18)\b/i.test(D)&&!/parent|guardian|legal(ly)? (authori[sz]ed )?representative/i.test(s)){r.st='warn';r.notes.push('Minors appear in the study, but parental or guardian consent is not mentioned.');
+    r.req.push({issue:'The study includes minors, but the statement does not mention consent from parents or legal guardians.',why:'Minors cannot give legally valid consent on their own. Consent must come from a parent or legal guardian, with the child\'s own assent where appropriate.',fix:`Please revise the statement as follows:\n${TPL.minor}`})}
+  if(/\bcase (report|series)\b/i.test(D)&&!/publi(sh|cation)/i.test(s)){r.st='warn';r.notes.push('Case report: consent to publish is not mentioned.');
+    r.req.push({issue:'This is a case report, but the statement does not confirm consent to publication.',why:'Case reports can make patients identifiable, so consent to publish is required in addition to consent to treatment or participation.',fix:`Please add:\n${TPL.pub}`})}
   return r}
 
 const REG=[['ClinicalTrials.gov',/\bNCT\s?\d{8}\b/gi],['ChiCTR',/\bChiCTR[-\s]?[A-Z]{0,4}-?\d{6,12}\b/gi],['ISRCTN',/\bISRCTN\s?\d{8}\b/gi],['EU CTR',/\b20\d{2}-5\d{5}-\d{2}-\d{2}\b/g],['EudraCT',/\b(19|20)\d{2}-\d{6}-\d{2}\b/g],['CTRI',/\bCTRI\/\d{4}\/\d{2,3}\/\d{6}\b/gi],['ANZCTR',/\bACTRN\d{14}\b/gi],['DRKS',/\bDRKS\d{8}\b/gi],['jRCT',/\bjRCT\d{10}\b/gi],['PACTR',/\bPACTR\d{15}\b/gi],['IRCT',/\bIRCT\d{8,}N\d+\b/gi],['TCTR',/\bTCTR\d{11}\b/gi],['CRiS',/\bKCT\d{7}\b/gi]];
@@ -305,11 +369,15 @@ function run(changed){
   const n=s=>res.filter(r=>r.st===s).length,m=n('miss'),w=n('warn'),o=n('ok');
   const head=m?`${m} item${m>1?'s':''} need${m>1?'':'s'} action before review`:w?`No blocking gaps; ${w} line${w>1?'s':''} to check`:'Back matter looks complete';
   $('#out').innerHTML=`<div class="sum"><p class="h">${head}</p><div class="fig"><div class="m"><b>${m}</b><span>Action needed</span></div><div><b>${w}</b><span>Check</span></div><div><b>${o}</b><span>OK</span></div></div></div>
-  <ol class="sheet">${res.map(r=>`<li class="ck s-${r.st}"><span class="st">${STL[r.st]}</span><div><h3>${esc(r.title)}</h3><ul>${r.notes.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>${r.req.length&&(r.st==='miss'||r.st==='warn')?`<label class="inc"><input type="checkbox" data-id="${r.id}" ${excl.has(r.id)?'':'checked'}> Include in author email</label>`:''}${r.ex?`<details><summary>Text found</summary><p class="ex">${esc(r.ex.slice(0,600))}</p></details>`:''}</div></li>`).join('')}</ol>`;
+  <ol class="sheet">${res.map(r=>`<li class="ck s-${r.st}"><span class="st">${STL[r.st]}</span><div><h3>${esc(r.title)}</h3><ul>${r.notes.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>${(r.st==='miss'||r.st==='warn')?r.req.filter(q=>q.why).map(q=>`<div class="adv"><p><b>Problem:</b> ${esc(q.issue)}</p><p><b>Why:</b> ${esc(q.why)}</p><p class="fx"><b>How to revise:</b></p><p class="ex">${esc(q.fix)}</p></div>`).join(''):''}${r.req.length&&(r.st==='miss'||r.st==='warn')?`<label class="inc"><input type="checkbox" data-id="${r.id}" ${excl.has(r.id)?'':'checked'}> Include in author email</label>`:''}${r.ex?`<details><summary>Text found</summary><p class="ex">${esc(r.ex.slice(0,600))}</p></details>`:''}</div></li>`).join('')}</ol>`;
   mail()}
 
+const HEAD={irb:'Institutional Review Board Statement',consent:'Informed Consent Statement',trial:'Clinical trial registration',guide:'Reporting guideline',data:'Data Availability Statement',coi:'Conflicts of Interest',funding:'Funding',contrib:'Author Contributions',authors:'Author list',ai:'Use of generative AI'};
+function block(q,ex){if(typeof q==='string')return q;return ex?`Problem: ${q.issue}\nWhy this matters: ${q.why}\nHow to revise: ${q.fix}`:`${q.issue}\n${q.fix}`}
 function mail(){
-  const items=res.filter(r=>(r.st==='miss'||r.st==='warn')&&r.req.length&&!excl.has(r.id)).flatMap(r=>r.req);
+  const ex=$('#why').checked;
+  const groups=res.filter(r=>(r.st==='miss'||r.st==='warn')&&r.req.length&&!excl.has(r.id));
+  const items=groups.map(r=>`${HEAD[r.id]}\n${r.req.map(q=>block(q,ex)).join('\n\n')}`);
   const id=$('#mid').value.trim(),w=$('#who').value.trim(),sg=$('#sign').value.trim()||'Vaccines Editorial Office';
   $('#mailtxt').value=!items.length?'':`Dear ${w||'Authors'},
 
@@ -332,6 +400,7 @@ let tm;$('#ms').addEventListener('input',()=>{clearTimeout(tm);$('#fstat').textC
 $('#types').addEventListener('click',e=>{const b=e.target.closest('[data-k]');if(!b||!P)return;T[b.dataset.k]=!T[b.dataset.k];run(false)});
 $('#out').addEventListener('change',e=>{const c=e.target.closest('input[data-id]');if(!c)return;c.checked?excl.delete(c.dataset.id):excl.add(c.dataset.id);mail()});
 for(const i of ['#mid','#who','#sign'])$(i).addEventListener('input',mail);
+$('#why').addEventListener('change',mail);
 try{const s=localStorage.getItem('cc-sign');if(s)$('#sign').value=s}catch(e){}
 $('#sign').addEventListener('change',()=>{try{localStorage.setItem('cc-sign',$('#sign').value)}catch(e){}});
 $('#copymail').addEventListener('click',()=>{const v=$('#mailtxt').value;if(v)copy(v,$('#mailtxt'));else $('#copied').textContent='Nothing to copy yet.'});
